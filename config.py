@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 APP_NAME = "FINANCE-TRACKER" # Tạo một app có tên FINACE-TRACKER
 # MONGO configuration
-#MONGO_URI = os.getenv("MONGO_URI", "localhost:27017") # localhost:2017 by default (prevent errors when running on localhost)
+#MONGO_URI = os.getenv("MONGO_URI", "serverSelectionTimeoutMS=20000") # localhost:2017 by default (prevent errors when running on localhost)
 
 MONGO_URI = os.getenv("MONGO_URI", "serverSelectionTimeoutMS=20000")
 DATABASE_NAME = "finance_tracker"
