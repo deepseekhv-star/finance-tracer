@@ -51,43 +51,92 @@ st.set_page_config(
 # =============================================
 # 1. Authen User
 # =============================================
+# def login_screen():
+#     with st.container():
+#         st.header("This app is private")
+#         st.subheader("Please login to continue")
+#         st.button("Please with Google", on_click = st.login)
+
+# if not st.user.is_logged_in:
+#     login_screen()
+# else:
+#     # Get mongo_user
+#     user_model:UserModel = models['user']
+#     try:
+#         mongo_user_id = user_model.login(st.user.email)
+
+#     except Exception as e:
+#         st.error(f"Error during user login: {e}")
+#         st.stop()   
+
+#     # set user_id for models
+#     # currently we have category and transaction models
+#     # you can optimize this by doing it in the model init function
+#     models['category'].set_user_id(mongo_user_id)
+#     models['transaction'].set_user_id(mongo_user_id)
+#     models['budget'].set_user_id(mongo_user_id)
+
+   
+
+#     user = st.user.to_dict()
+#     user.update({
+#         "id":mongo_user_id    
+#     })
+
+  
+#     render_user_profile(user_model, user)
+
+#     # init analyzer
+#     # because trasaction_model has set user_id already in line 71
+#     analyzer_model = FinanceAnalyzer(models['transaction'])
+
+
+# =============================================
+# 1. Authentication (Streamlit Cloud - New API)
+# =============================================
+
+user = st.experimental_user   # None nếu chưa login
+
 def login_screen():
-    with st.container():
-        st.header("This app is private")
-        st.subheader("Please login to continue")
-        st.button("Please with Google", on_click = st.login)
+    st.header("This app is private")
+    st.subheader("Please login to continue")
+    st.info("Please use the 'Sign in' button at the top-right corner of the page.")
 
-if not st.user.is_logged_in:
+# Nếu user chưa đăng nhập
+if user is None:
     login_screen()
-else:
-    # Get mongo_user
-    user_model:UserModel = models['user']
-    try:
-        mongo_user_id = user_model.login(st.user.email)
+    st.stop()
 
+# Nếu user đã đăng nhập
+else:
+    # email từ Streamlit Cloud
+    user_email = user.get("email")
+
+    # Model
+    user_model: UserModel = models["user"]
+
+    try:
+        mongo_user_id = user_model.login(user_email)
     except Exception as e:
         st.error(f"Error during user login: {e}")
-        st.stop()   
+        st.stop()
 
-    # set user_id for models
-    # currently we have category and transaction models
-    # you can optimize this by doing it in the model init function
+    # Set user_id cho các model
     models['category'].set_user_id(mongo_user_id)
     models['transaction'].set_user_id(mongo_user_id)
     models['budget'].set_user_id(mongo_user_id)
 
-   
+    # tạo object user info
+    user_data = {
+        "id": mongo_user_id,
+        "email": user_email,
+        "name": user.get("name"),
+    }
 
-    user = st.user.to_dict()
-    user.update({
-        "id":mongo_user_id    
-    })
-
-  
-    render_user_profile(user_model, user)
+    # Render user profile
+    render_user_profile(user_model, user_data)
 
     # init analyzer
-    # because trasaction_model has set user_id already in line 71
     analyzer_model = FinanceAnalyzer(models['transaction'])
 
     # =============================================
