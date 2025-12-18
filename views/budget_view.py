@@ -3,6 +3,7 @@ from datetime import datetime
 from utils import format_currency,format_date,handler_datetime
 import config
 from database import TransactionModel
+import pandas as pd
 
 def render_budget(budget_model, category_model, transaction_model):
 
@@ -11,9 +12,16 @@ def render_budget(budget_model, category_model, transaction_model):
     - Each category has a budget limit
     - Track spending per category
     - Sync with transactions
+    - Dashboard view with charts and summaries
     """
-    st.title("💰 Budget Dashboard")
+    st.title("💰 Budgets")
 
+    #Dashboard
+    render_budget_dashboard(
+        budget_model,
+        transaction_model,
+        category_model
+    )
     # Fetch all budgets
     budgets = budget_model.get_all_budgets()
     #category_type = category_model.get_all_category_types()
@@ -226,5 +234,123 @@ def _render_budget_card(budget, spent, remaining, exceeded, budget_model,categor
                         st.session_state.edit_budget = None
                         st.rerun()   
 
+def render_budget_dashboard(
+                            budget_model,
+                            transaction_model,
+                            category_model
+                        ):
+    st.title("📊 Budget Dashboard")
 
-                    
+    # ==========================
+    # Month / Year Filter
+    # ==========================
+    now = datetime.now()
+
+    col1, col2, _ = st.columns([2, 2, 6])
+
+    with col1:
+        month = st.selectbox(
+            "📅 Month",
+            options=list(range(1, 13)),
+            index=now.month - 1
+        )
+
+    with col2:
+        year = st.number_input(
+            "📆 Year",
+            min_value=2000,
+            max_value=2100,
+            value=now.year,
+            step=1
+        )
+
+    summary = _build_budget_summary(
+        budget_model,
+        transaction_model,
+        category_model,
+        month,
+        year
+    )
+
+    if not summary:
+        st.warning("No budget data available.")
+        return
+
+    _render_summary_cards(summary)
+    st.divider()
+    _render_budget_chart(summary)
+    st.divider()
+    _render_budget_table(summary)
+    st.divider()
+def _build_budget_summary(
+                        budget_model,
+                        transaction_model,
+                        category_model,
+                        month,
+                        year
+                    ):
+    categories = category_model.get_category_by_type("Expense")
+    budgets = budget_model.get_all_budgets(month, year)
+
+    budget_map = {
+        b["category"]: b["limit_amount"]
+        for b in budgets
+    }
+
+    summary = []
+
+    for cate in categories:
+        name = cate["name"]
+
+        limit_amount = budget_map.get(name, 0)
+
+        spent = transaction_model.get_total_spent_by_category(
+            name,
+            month,
+            year
+        )
+
+        remaining = limit_amount - spent
+
+        summary.append({
+            "Category": name,
+            "Budget": limit_amount,
+            "Spent": spent,
+            "Remaining": remaining,
+            "Status": "Over" if remaining < 0 else "OK"
+        })
+
+    return summary
+
+def _render_summary_cards(summary):
+    total_budget = sum(s["Budget"] for s in summary)
+    total_spent = sum(s["Spent"] for s in summary)
+    total_remaining = total_budget - total_spent
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("💰 Total Budget", format_currency(total_budget))
+    col2.metric("💸 Total Spent", format_currency(total_spent))
+    col3.metric(
+        "🧾 Remaining",
+        format_currency(total_remaining),
+        delta=format_currency(total_remaining),
+    )
+
+def _render_budget_table(summary):
+    df = pd.DataFrame(summary)
+
+    df["Budget"] = df["Budget"].apply(format_currency)
+    df["Spent"] = df["Spent"].apply(format_currency)
+    df["Remaining"] = df["Remaining"].apply(format_currency)
+
+    st.subheader("📋 Category Budget Breakdown")
+    st.dataframe(df, use_container_width=True)
+
+def _render_budget_chart(summary):
+    df = pd.DataFrame(summary)
+
+    df_chart = df.set_index("Category")[["Budget", "Spent"]]
+
+    st.subheader("📊 Budget vs Spent")
+    st.bar_chart(df_chart)

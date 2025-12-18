@@ -8,8 +8,12 @@ import pandas as pd
 from typing import Optional
 from bson.objectid import ObjectId
 from .transaction_model import TransactionModel #Đạt thêm budbet
+from .budget_model import BudgetModel
 
 collection_name = config.COLLECTIONS['category'] # Lay ten collection tu config
+
+UNCATEGORIZED_NAME = "Uncategorized" #Topic 2
+
 
 # Class xử lý CRUD cho CategoryModel
 class CategoryModel:
@@ -26,6 +30,8 @@ class CategoryModel:
         self.user_id = ObjectId(user_id) if user_id is not None else None
         #after we have user_id, initialize their default category
         self.__initialize_user_default_categories__()
+        # ensure system Uncategorized
+        self.__ensure_system_categories__() #Topic 2
 
     # Khoi tao category mac dinh
     def __initialize_user_default_categories__(self):
@@ -152,10 +158,58 @@ class CategoryModel:
         )
         return result.upserted_id
 
+    #Topic 2:
     # Nút xóa category
+    # def delete_category(self, category_type: str, category_name: str):
+    #     result = self.collection.delete_one({"type": category_type, "name": category_name,"user_id": self.user_id}) # add user_id condition
+    #     return result.deleted_count
+    
     def delete_category(self, category_type: str, category_name: str):
-        result = self.collection.delete_one({"type": category_type, "name": category_name,"user_id": self.user_id}) # add user_id condition
-        return result.deleted_count
+        if category_name == UNCATEGORIZED_NAME:
+            raise Exception("System category cannot be deleted")
+
+        if not self.user_id:
+            raise Exception("User not set")
+
+        # 1️⃣ Ensure Uncategorized exists
+        self.ensure_uncategorized_category(category_type)
+
+        # 2️⃣ Move transactions → Uncategorized
+        transaction_model = TransactionModel(self.user_id)
+        transaction_model.collection.update_many(
+            {
+                "category": category_name,
+                "type": category_type,
+                "user_id": self.user_id
+            },
+            {
+                "$set": {
+                    "category": UNCATEGORIZED_NAME,
+                    "last_modified": datetime.now()
+                }
+            }
+        )
+
+        # 3️⃣ DELETE related budgets (IMPORTANT – Budget Integrity)
+        budget_model = BudgetModel(self.user_id)
+        budget_model.collection.delete_many(
+            {
+                "category": category_name,
+                "type": category_type,
+                "user_id": self.user_id
+            }
+        )
+
+        # 4️⃣ Delete category
+        result = self.collection.delete_one(
+            {
+                "type": category_type,
+                "name": category_name,
+                "user_id": self.user_id
+            }
+        )
+
+        return result.deleted_count > 0
 
     # Nút tim kiếm category theo category_type
     def get_category_by_type(self, category_type: str):
@@ -212,7 +266,148 @@ class CategoryModel:
             "spent": spent,
             "remaining": remaining,
             "is_over": over
-        }      
+        }   
+
+    # Topic 2: Ensure system category 'Uncategorized' exists for user
+    def ensure_uncategorized_category(self, category_type: str):
+        if not self.user_id:
+            return
+
+        self.collection.update_one(
+            {
+                "type": category_type,
+                "name": UNCATEGORIZED_NAME,
+                "user_id": self.user_id
+            },
+            {
+                "$setOnInsert": {
+                    "created_at": datetime.now(),
+                    "system": True
+                },
+                "$set": {
+                    "last_modified": datetime.now()
+                }
+            },
+            upsert=True
+        )
+
+    def __ensure_system_categories__(self):
+        for category_type in config.TRANSACTION_TYPES: #["Expense", "Income"]:
+            self.ensure_uncategorized_category(category_type)
+            
+    # def update_category_name(
+    #                         self,
+    #                         category_type: str,
+    #                         old_name: str,
+    #                         new_name: str
+    #                     ) -> bool:
+    #     """
+    #     Update category name and sync all related transactions
+    #     """
+    #     if not self.user_id:
+    #         raise Exception("User not set")
+    #     if old_name == UNCATEGORIZED_NAME:
+    #         raise Exception("System category cannot be renamed")
+
+    #     # 1️⃣ Update category name
+    #     result = self.collection.update_one(
+    #         {
+    #             "type": category_type,
+    #             "name": old_name,
+    #             "user_id": self.user_id
+    #         },
+    #         {
+    #             "$set": {
+    #                 "name": new_name,
+    #                 "last_modified": datetime.now()
+    #             }
+    #         }
+    #     )
+
+    #     if result.modified_count == 0:
+    #         return False
+
+    #     # 2️⃣ Sync transactions
+    #     transaction_model = TransactionModel(self.user_id)
+    #     transaction_model.reassign_category(
+    #         old_category_name=old_name,
+    #         new_category_name=new_name
+    #     )
+
+    #     return True
+
+    def update_category_name(
+                    self,
+                    category_type: str,
+                    old_name: str,
+                    new_name: str
+                ) -> bool:
+        """
+        Update category name and sync:
+        - transactions
+        - budgets
+        """
+        if not self.user_id:
+            raise Exception("User not set")
+
+        if old_name == UNCATEGORIZED_NAME:
+            raise Exception("System category cannot be renamed")
+
+        # ❌ Prevent duplicate category
+        existed = self.collection.find_one({
+            "type": category_type,
+            "name": new_name,
+            "user_id": self.user_id
+        })
+        if existed:
+            raise Exception("Category name already exists")
+
+        # 1️⃣ Update category
+        result = self.collection.update_one(
+            {
+                "type": category_type,
+                "name": old_name,
+                "user_id": self.user_id
+            },
+            {
+                "$set": {
+                    "name": new_name,
+                    "last_modified": datetime.now()
+                }
+            }
+        )
+
+        if result.modified_count == 0:
+            return False
+
+        # 2️⃣ Sync transactions
+        transaction_model = TransactionModel(self.user_id)
+        transaction_model.collection.update_many(
+            {
+                "category": old_name,
+                "type": category_type,
+                "user_id": self.user_id
+            },
+            {
+                "$set": {
+                    "category": new_name,
+                    "last_modified": datetime.now()
+                }
+            }
+        )
+
+        # 3️⃣ Sync budgets 
+        budget_model = BudgetModel(self.user_id)
+        budget_model.reassign_category(
+            category_type=category_type,
+            old_category_name=old_name,
+            new_category_name=new_name
+        )
+
+        return True
+
+
+       
 '''
 if __name__== "__main__":
     print("Init category collection")

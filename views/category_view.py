@@ -1,7 +1,89 @@
 import streamlit as st
 import config
 
+SYSTEM_CATEGORY_NAME = "Uncategorized"
+
+#Chưa có sử dụng “Uncategorized”
 #function to render category list
+# def _render_category_list(category_model,category_type:str):
+#     st.subheader(f"➕ {category_type} Categories")
+#     expense_lst=category_model.get_category_by_type(category_type=category_type)
+
+#     if expense_lst:
+#         st.write(f"Total:{len(expense_lst)} categories")
+#         st.write("")
+
+#         cols = st.columns(4)
+
+#         for idx,item in enumerate(expense_lst):
+#             col_idx = idx % 4 # remaining fraction (chia thành 4 cột rồi lặp lại)
+
+#             with cols[col_idx]:
+#                 with st.container():
+#                     subcol_a, subcol_b = st.columns([4,1])
+
+#                     with subcol_a:
+#                         st.write(f"📌{item.get("name")}")
+#                         st.caption(f"{item.get("created_at").strftime("%d-%m-%Y")}")
+
+#                     with subcol_b:
+#                         delete_button = st.button("❌",key = f"del_exp_{item["_id"]}")  
+#                          if delete_button:
+#                              result = category_model.delete_category(category_type = item.get("type"),
+#                                                                      category_name = item.get("name"))                      
+#                              if result:
+#                                  st.success(f"Delete {item.get("name")} done")
+#                                  st.rerun()
+#                              else:
+#                                  st.error(f"Delete {item.get("name")} failed")
+#######################################################################################
+#Có sử dụng “Uncategorized”
+# def _render_category_list(category_model,category_type:str):
+#     st.subheader(f"➕ {category_type} Categories")
+#     expense_lst=category_model.get_category_by_type(category_type=category_type)
+
+#     if expense_lst:
+#         st.write(f"Total:{len(expense_lst)} categories")
+#         st.write("")
+
+#         cols = st.columns(4)
+
+#         for idx,item in enumerate(expense_lst):
+#             col_idx = idx % 4 # remaining fraction (chia thành 4 cột rồi lặp lại)
+
+#             with cols[col_idx]:
+#                 with st.container():
+#                     subcol_a, subcol_b = st.columns([4,1])
+
+#                     with subcol_a:
+#                         st.write(f"📌{item.get("name")}")
+#                         st.caption(f"{item.get("created_at").strftime("%d-%m-%Y")}")
+
+#                     with subcol_b:
+#                         category_name = item.get("name")
+
+#                         if category_name == SYSTEM_CATEGORY_NAME:
+#                             st.button("🔒", key=f"lock_{item['_id']}", disabled=True)
+#                         else:
+#                             if st.button("❌", key=f"del_{item['_id']}"):
+#                                 try:
+#                                     result = category_model.delete_category(
+#                                         category_type=item.get("type"),
+#                                         category_name=category_name
+#                                     )
+#                                     if result:
+#                                         st.success(
+#                                             f"Deleted '{category_name}'. "
+#                                             f"Related transactions were moved to '{SYSTEM_CATEGORY_NAME}'."
+#                                         )
+#                                         st.rerun()
+#                                     else:
+#                                         st.error(f"Delete '{category_name}' failed")
+#                                 except Exception as e:
+#                                     st.error(str(e))
+
+#######################################################################################
+#Có sử dụng “Uncategorized” và edit button
 def _render_category_list(category_model,category_type:str):
     st.subheader(f"➕ {category_type} Categories")
     expense_lst=category_model.get_category_by_type(category_type=category_type)
@@ -24,16 +106,40 @@ def _render_category_list(category_model,category_type:str):
                         st.caption(f"{item.get("created_at").strftime("%d-%m-%Y")}")
 
                     with subcol_b:
-                        delete_button = st.button("❌",key = f"del_exp_{item["_id"]}")  
-                        if delete_button:
-                            result = category_model.delete_category(category_type = item.get("type"),
-                                                                    category_name = item.get("name"))
-                            if result:
-                                st.success(f"Delete {item.get("name")} done")
-                                st.rerun()
-                            else:
-                                st.error(f"Delete {item.get("name")} failed")
+                        category_name = item.get("name")
+                        category_id = str(item.get("_id"))
+                        category_type = item.get("type")
 
+                        # SYSTEM CATEGORY → khóa
+                        if category_name == SYSTEM_CATEGORY_NAME:
+                            st.button("🔒", key=f"lock_{category_id}", disabled=True)
+                        else:
+                            # EDIT
+                            if st.button("✏️", key=f"edit_{category_id}"):
+                                st.session_state["edit_category"] = {
+                                    "id": category_id,
+                                    "old_name": category_name,
+                                    "type": category_type
+                                }
+
+                            # DELETE
+                            if st.button("❌", key=f"del_{category_id}"):
+                                try:
+                                    result = category_model.delete_category(
+                                        category_type=category_type,
+                                        category_name=category_name
+                                    )
+                                    if result:
+                                        st.success(
+                                            f"Deleted '{category_name}'. "
+                                            f"Related transactions were moved to '{SYSTEM_CATEGORY_NAME}'."
+                                        )
+                                        st.rerun()
+                                    else:
+                                        st.error(f"Delete '{category_name}' failed")
+                                except Exception as e:
+                                    st.error(str(e))
+                                    
 #Read category by frame
 def _render_category_frame(category_model,category_type:str):
     st.subheader(f"➕ {category_type} Categories list")
@@ -70,52 +176,142 @@ def _render_category_detail(category_model):
 
     with tab1:
         _render_category_list(category_model,"Expense")
-        _render_category_frame(category_model,"Expense")
+    #    _render_category_frame(category_model,"Expense")
 
     with tab2:
         _render_category_list(category_model,"Income")   
-        _render_category_frame(category_model,"Income") 
+    #    _render_category_frame(category_model,"Income") 
 
 
 #TODO
+# def _render_add_category(category_model):
+#     st.subheader("✅ Add category")
+#     with st.form("add_category_name"):
+#         col1, col2, col3 = st.columns([2, 2, 1]) # col1 and col2 is double size of col1
+
+#     # category type
+#     with col1:
+#         category_type = st.selectbox(
+#             "Category Type",
+#             config.TRANSACTION_TYPES # ["Expense", "Income"]
+#         )
+    
+#     # category input
+#     with col2:
+#         category_name = st.text_input(
+#             "Category Name",
+#             placeholder="e.g., Groceries, Rent, Bonus"
+#         )
+    
+#     with col3:
+#         st.write("")  # Spacing
+#         st.write("")
+#         submitted = st.form_submit_button("Submit", use_container_width=True)
+    
+#     if submitted:
+#         if not category_name:
+#             st.error("❌ Please enter a category name")
+#         elif not category_type:
+#             st.error("❌ Please choose a category type")          
+#         else:
+#             result = category_model.upsert_category(category_type = category_type, category_name = category_name)
+#             if result:
+#                 st.success(f"✅ Category '{category_name}' added successfully!")
+#                 st.balloons()
+#                 st.rerun()  # Refresh the page to show new category
+#             else:
+#                 st.error("❌ Error adding category")
+
 def _render_add_category(category_model):
     st.subheader("✅ Add category")
-    with st.form("add_category_name"):
-        col1, col2, col3 = st.columns([2, 2, 1]) # col1 and col2 is double size of col1
 
-    # category type
-    with col1:
-        category_type = st.selectbox(
-            "Category Type",
-            config.TRANSACTION_TYPES # ["Expense", "Income"]
-        )
-    
-    # category input
-    with col2:
-        category_name = st.text_input(
-            "Category Name",
-            placeholder="e.g., Groceries, Rent, Bonus"
-        )
-    
-    with col3:
-        st.write("")  # Spacing
-        st.write("")
-        submitted = st.form_submit_button("Submit", use_container_width=True)
-    
+    with st.form("add_category_form"):
+        col1, col2, col3 = st.columns([2, 2, 1])
+
+        with col1:
+            category_type = st.selectbox(
+                "Category Type",
+                config.TRANSACTION_TYPES
+            )
+
+        with col2:
+            category_name = st.text_input(
+                "Category Name",
+                placeholder="e.g., Groceries, Rent"
+            )
+
+        with col3:
+            st.write("")
+            st.write("")
+            submitted = st.form_submit_button(
+                "Submit",
+                use_container_width=True
+            )
+
     if submitted:
-        if not category_name:
-            st.error("❌ Please enter a category name")
-        elif not category_type:
-            st.error("❌ Please choose a category type")          
-        else:
-            result = category_model.upsert_category(category_type = category_type, category_name = category_name)
-            if result:
-                st.success(f"✅ Category '{category_name}' added successfully!")
-                st.balloons()
-                st.rerun()  # Refresh the page to show new category
-            else:
-                st.error("❌ Error adding category")
+        category_name = category_name.strip()
 
+        if not category_name:
+            st.error("❌ Category name cannot be empty")
+            return
+
+        result = category_model.upsert_category(
+            category_type=category_type,
+            category_name=category_name
+        )
+
+        if result:
+            st.success(f"✅ Category '{category_name}' added successfully!")
+            st.rerun()
+
+#Topic: Edit category
+def _render_edit_category(category_model):
+    if "edit_category" not in st.session_state:
+        return
+
+    data = st.session_state["edit_category"]
+
+    st.divider()
+    st.subheader("✏️ Edit Category")
+
+    with st.form("edit_category_form"):
+        new_name = st.text_input(
+            "New category name",
+            value=data["old_name"]
+        )
+
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            submitted = st.form_submit_button("💾 Update")
+
+        with col2:
+            cancelled = st.form_submit_button("❌ Cancel")
+
+    if cancelled:
+        del st.session_state["edit_category"]
+        st.rerun()
+
+    if submitted:
+        new_name = new_name.strip()
+
+        if not new_name:
+            st.error("❌ Category name cannot be empty")
+            return
+
+        result = category_model.update_category_name(
+            category_type=data["type"],
+            old_name=data["old_name"],
+            new_name=new_name
+        )
+
+        if result:
+            st.success("✅ Category updated successfully")
+
+            del st.session_state["edit_category"]
+            st.rerun()
+        else:
+            st.error("❌ Update failed")
 
 # public function
 def render_categories(category_model):
@@ -123,6 +319,7 @@ def render_categories(category_model):
 
     # Display existing category list
     _render_category_detail(category_model)
+    _render_edit_category(category_model)
 
     st.divider()
 

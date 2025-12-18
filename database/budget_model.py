@@ -162,3 +162,26 @@ class BudgetModel:
                 "is_over": over
                 })
         return enriched
+
+    def reassign_category(
+            self,
+            category_type: str,
+            old_category_name: str,
+            new_category_name: str
+        ):
+        """
+        Update all budgets when category name is renamed
+        """
+        return self.collection.update_many(
+            {
+                "category": old_category_name,
+                "type": category_type,
+                "user_id": self.user_id
+            },
+            {
+                "$set": {
+                    "category": new_category_name,
+                    "updated_at": datetime.now()
+                }
+            }
+        )    

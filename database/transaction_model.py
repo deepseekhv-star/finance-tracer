@@ -298,7 +298,36 @@ class TransactionModel:
             })
 
         return summary    
-        
-    
+
+    #Topic 2:    
+    # ============================
+    # SET DEFAULT CATEGORY (CÁCH 3)
+    # ============================
+    def reassign_category(
+        self,
+        old_category_name: str,
+        new_category_name: str
+    ):
+        """
+        Reassign all transactions from old category to new category
+        (Used when deleting a category to avoid orphaned transactions)
+        """
+        if not self.user_id:
+            return None
+
+        result = self.collection.update_many(
+            {
+                "user_id": self.user_id,
+                "category": old_category_name
+            },
+            {
+                "$set": {
+                    "category": new_category_name,
+                    "last_modified": datetime.now()
+                }
+            }
+        )
+        return result
+
     
                    
