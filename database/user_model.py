@@ -42,7 +42,7 @@ class UserModel:
         #All checking passed
         return str(user.get("_id"))    
 
-    def deactivate(self,user_id:str) -> bool:
+    def deactivate_user(self,user_id:str) -> bool:
         #find and update
         user = self.collection.find_one({
             "_id": ObjectId(user_id),
