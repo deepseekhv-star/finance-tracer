@@ -100,7 +100,7 @@ user = st.experimental_user   # None nếu chưa login
 def login_screen():
     st.header("This app is private")
     st.subheader("Please login to continue")
-    st.info("Please use the 'Sign in' button at the top-right corner of the page.")
+    st.button("Please with Google", on_click = st.login)
 
 # Nếu user chưa đăng nhập
 if not user or not user.get("email"):
