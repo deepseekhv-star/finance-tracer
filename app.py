@@ -94,87 +94,92 @@ st.set_page_config(
 # =============================================
 # 1. Authentication (Streamlit Cloud - New API)
 # =============================================
+def require_login():
+    if "user_email" not in st.session_state:
+        st.session_state.user_email = None
 
-user = st.experimental_user   # None nếu chưa login
+    if not st.session_state.user_email:
+        st.title("🔐 Login Required")
+        st.caption("Please enter your email to continue")
 
-def login_screen():
-    st.header("This app is private")
-    st.subheader("Please login to continue")
-    st.button("Please with Google", on_click = st.login)
+        email = st.text_input("Email")
 
-# Nếu user chưa đăng nhập
-if not user or not user.get("email"):
-    login_screen()
+        if st.button("Login"):
+            if not email or "@" not in email:
+                st.error("Please enter a valid email")
+            else:
+                st.session_state.user_email = email
+                st.rerun()
+
+        st.stop()
+# Enforce login
+require_login()
+user_email = st.session_state.user_email
+
+# =============================================
+# 3. Login / Create user in MongoDB
+# =============================================
+user_model: UserModel = models["user"]
+
+try:
+    mongo_user_id = user_model.login(user_email)
+except Exception as e:
+    st.error(f"Error during user login: {e}")
     st.stop()
 
-# Nếu user đã đăng nhập
-else:
-    # email từ Streamlit Cloud
-    user_email = user.get("email")
+# Set user_id for all models
+models["category"].set_user_id(mongo_user_id)
+models["transaction"].set_user_id(mongo_user_id)
+models["budget"].set_user_id(mongo_user_id)
 
-    # Model
-    user_model: UserModel = models["user"]
+# User info object
+user_data = {
+    "id": mongo_user_id,
+    "email": user_email
+}
 
-    try:
-        mongo_user_id = user_model.login(user_email)
-    except Exception as e:
-        st.error(f"Error during user login: {e}")
-        st.stop()
+# Render user profile
+render_user_profile(user_model, user_data)
 
-    # Set user_id cho các model
-    models['category'].set_user_id(mongo_user_id)
-    models['transaction'].set_user_id(mongo_user_id)
-    models['budget'].set_user_id(mongo_user_id)
+# Init analyzer
+analyzer_model = FinanceAnalyzer(models["transaction"])
 
-    # tạo object user info
-    user_data = {
-        "id": mongo_user_id,
-        "email": user_email,
-        "name": user.get("name"),
-    }
+# =============================================
+# 2. Navigation
+# =============================================
 
-    # Render user profile
-    render_user_profile(user_model, user_data)
+page = st.sidebar.radio(
+    "Navigation",
+    ["Home", "Category", "Transaction", "Budget"]
+)
 
-    # init analyzer
-    analyzer_model = FinanceAnalyzer(models['transaction'])
+# =============================================
+# 3. Router
+# =============================================
+if page == "Home":
+    st.title("Home")
+    render_dashboard(analyzer_model=analyzer_model,
+                     transaction_model=models['transaction'],
+                     visualizer_model=models['visualizer'])
 
-    # =============================================
-    # 2. Navigation
-    # =============================================
+elif page == "Category":
+    # get category_model from models
+    category_model = models['category']
 
-    page = st.sidebar.radio(
-        "Navigation",
-        ["Home", "Category", "Transaction", "Budget"]
+
+    # display category views
+    render_categories(category_model=category_model)
+elif page == "Transaction":
+    # get category_model and transaction from models
+    category_model = models['category']
+    transaction_model = models['transaction']
+
+    # display transaction views
+    render_transactions(transaction_model=transaction_model, category_model=category_model)
+    # display transaction views
+elif page == "Budget":
+    render_budget(
+        budget_model=models['budget'],
+        category_model=models['category'],
+        transaction_model=models['transaction']
     )
-
-    # =============================================
-    # 3. Router
-    # =============================================
-    if page == "Home":
-        st.title("Home")
-        render_dashboard(analyzer_model=analyzer_model,
-                         transaction_model=models['transaction'],
-                         visualizer_model=models['visualizer'])
-
-    elif page == "Category":
-        # get category_model from models
-        category_model = models['category']
-
-
-        # display category views
-        render_categories(category_model=category_model)
-    elif page == "Transaction":
-        # get category_model and transaction from models
-        category_model = models['category']
-        transaction_model = models['transaction']
-
-        # display transaction views
-        render_transactions(transaction_model=transaction_model, category_model=category_model)
-        # display transaction views
-    elif page == "Budget":
-        render_budget(
-            budget_model=models['budget'],
-            category_model=models['category'],
-            transaction_model=models['transaction']
-        )
