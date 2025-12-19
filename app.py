@@ -103,7 +103,7 @@ def login_screen():
     st.info("Please use the 'Sign in' button at the top-right corner of the page.")
 
 # Nếu user chưa đăng nhập
-if user is None:
+if not user or not user.get("email"):
     login_screen()
     st.stop()
 
