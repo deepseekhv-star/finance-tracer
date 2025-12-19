@@ -329,12 +329,16 @@ def _render_summary_cards(summary):
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("💰 Total Budget", format_currency(total_budget))
-    col2.metric("💸 Total Spent", format_currency(total_spent))
-    col3.metric(
-        "🧾 Remaining",
-        format_currency(total_remaining),
-        delta=format_currency(total_remaining),
+    with col1:
+        st.metric("💰 Total Budget", format_currency(total_budget))
+    with col2:
+        st.metric("💸 Total Spent", format_currency(total_spent))
+    with col3:
+        st.metric(
+            label="🧾 Remaining",
+            value=format_currency(total_remaining),
+            delta=format_currency(total_remaining),
+            delta_color="normal" if total_remaining >=0 else "inverse"
     )
 
 def _render_budget_table(summary):
