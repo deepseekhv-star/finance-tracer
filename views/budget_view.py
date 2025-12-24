@@ -326,9 +326,8 @@ def _render_summary_cards(summary):
     total_budget = sum(s["Budget"] for s in summary)
     total_spent = sum(s["Spent"] for s in summary)
     total_remaining = total_budget - total_spent
-
+    
     col1, col2, col3 = st.columns(3)
-
     with col1:
         st.metric("💰 Total Budget", format_currency(total_budget))
     with col2:
@@ -340,6 +339,7 @@ def _render_summary_cards(summary):
             delta=format_currency(total_remaining),
             delta_color="normal" if total_remaining >=0 else "inverse"
     )
+       
 
 def _render_budget_table(summary):
     df = pd.DataFrame(summary)
